@@ -297,7 +297,7 @@ restartService(){
 
 # Prints the usage
 usage(){
-    echo 'USAGE: ./dnser.sh <IP_ADDRESS (not 127.0.0.1)> <FULL_DOMAIN_NAME>'
+    echo 'Usage: ./dnser.sh <IP_ADDRESS (not 127.0.0.1)> <FULL_DOMAIN_NAME>'
     echo ''
     echo 'EXAMPLE: If my network address is 192.168.1.11 and my FQDN is test.com, I will run: ./dnser.sh 192.168.1.11 test.com'
 }
