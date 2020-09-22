@@ -1,5 +1,6 @@
 #! /usr/bin/env bash
 
+# dnser version 0.1
 
 # Creates iptables rules to allow bind9 go though
 allowBind9iptables(){ # Implement this
@@ -8,7 +9,7 @@ allowBind9iptables(){ # Implement this
 
 # Checks the arguments passed to the script
 checkArguments(){
-    if [ $# -ne 1 ]; then
+    if [ $# -ne 2 ]; then
         usage
         return 1
     fi
@@ -74,6 +75,7 @@ checkRoot(){
 }
 
 # Configures everything
+# configureAll <LOCAL_IP_ADDRESS> <FULL_DOMAIN_NAME> <IP_OF_ONE_DNS_SERVER_ALLOWED_TO_ZONE_TRANSFER>
 configureAll(){
     installBind
     if [ $? -eq 1 ]; then
@@ -95,12 +97,30 @@ configureAll(){
     if [ $? -eq 1 ]; then
         return 1
     fi
+    createZone $2 $3
+    if [ $? -eq 1 ]; then
+        return 1
+    fi
+    restartService
+    if [ $? -eq 1 ]; then
+        return 1
+    fi
+    configureZone $1 $2
+    if [ $? -eq 1 ]; then
+        return 1
+    fi
+    restartService
+    if [ $? -eq 1 ]; then
+        return 1
+    fi
 
+    echo '[*] Looks like everything went well!'
+    echo '[*] Try to query the server and see if it works!'
     return 0
 }
 
 # Configures /etc/bind/named.conf.options so it listens on the specified interface
-# configureNamedConfOptions <IP_ADDRESS>
+# configureNamedConfOptions <LOCAL_IP_ADDRESS>
 configureNamedConfOptions(){
     echo '[*] Configuring /etc/bind/named.conf.options file for your IP'
     # Configure named.conf.options
@@ -117,9 +137,11 @@ configureNamedConfOptions(){
     echo "        // Uncomment the following block, and insert the addresses replacing" >> /etc/bind/named.conf.options
     echo "        // the all-0's placeholder." >> /etc/bind/named.conf.options
     echo "" >> /etc/bind/named.conf.options
-    echo "        // forwarders {" >> /etc/bind/named.conf.options
-    echo "        //      0.0.0.0;" >> /etc/bind/named.conf.options
-    echo "        // };" >> /etc/bind/named.conf.options
+    echo "        // dnser" >> /etc/bind/named.conf.options
+    echo "        forwarders {" >> /etc/bind/named.conf.options
+    echo "             8.8.8.8;" >> /etc/bind/named.conf.options
+    echo "             8.8.4.4;" >> /etc/bind/named.conf.options
+    echo "        };" >> /etc/bind/named.conf.options
     echo "" >> /etc/bind/named.conf.options
     echo "        //========================================================================" >> /etc/bind/named.conf.options
     echo "        // If BIND logs error messages about the root key being expired," >> /etc/bind/named.conf.options
@@ -128,16 +150,6 @@ configureNamedConfOptions(){
     echo "        dnssec-validation auto;" >> /etc/bind/named.conf.options
     echo "" >> /etc/bind/named.conf.options
     echo "        listen-on-v6 { any; };" >> /etc/bind/named.conf.options
-    echo "        listen-on {" >> /etc/bind/named.conf.options
-    echo "        $1;" >> /etc/bind/named.conf.options
-    echo "        127.0.0.1;" >> /etc/bind/named.conf.options
-    echo "        };" >> /etc/bind/named.conf.options
-    echo "" >> /etc/bind/named.conf.options
-    echo "        allow-query { any; };" >> /etc/bind/named.conf.options
-    echo "        forwarders {" >> /etc/bind/named.conf.options
-    echo "        8.8.8.8;" >> /etc/bind/named.conf.options
-    echo "        8.8.4.4;" >> /etc/bind/named.conf.options
-    echo "        };" >> /etc/bind/named.conf.options
     echo "};" >> /etc/bind/named.conf.options
 
     named-checkconf
@@ -146,14 +158,87 @@ configureNamedConfOptions(){
          return 0
     else
         echo '[-] Error: named.conf.options file misconfigurated'
-        echo '[*] Restaurating default file'
+        echo '[*] Restoring default file'
         mv /etc/bind/named.conf.options.old /etc/bind/named.conf.options
         named-checkconf
         if [ $? -eq 0 ];then
-            echo '[*] named.conf.options file restaurated successfully'
+            echo '[*] named.conf.options file restored successfully'
             return 0
         else
-            echo '[-] Error: Restaured named.conf.options file has errors. Please check it and fix those errors.'
+            echo '[-] Error: Restored named.conf.options file has errors. Please check it and fix those errors.'
+            return 1
+        fi
+    fi
+}
+
+# Configures the new zone file /etc/bind/db.<FULL_DOMAIN_NAME>
+# configureZone <LOCAL_IP_ADDRESS> <FULL_DOMAIN_NAME>
+configureZone(){
+    echo '[*] Creating and configuring the zone file /etc/bind/db.$2'
+    echo '' >/etc/bind/db.$2
+    
+    echo "; dnser" >> /etc/bind/db.$2
+    echo '$ORIGIN $2' >> /etc/bind/db.$2
+    echo '$TTL 86400' >> /etc/bind/db.$2
+    echo "@     IN      SOA     $2.    hostmaster.$2. (" >> /etc/bind/db.$2
+    echo "                      2       ; serial" >> /etc/bind/db.$2
+    echo "                      21600   ; refresh after 6 hours" >> /etc/bind/db.$2
+    echo "                      3600    ; retry after 1 hour" >> /etc/bind/db.$2
+    echo "                      604800  ; expire after 1 week" >> /etc/bind/db.$2
+    echo "                      86400 ) ; minimum TTL of 1 day" >> /etc/bind/db.$2
+    echo ";" >> /etc/bind/db.$2
+    echo "      IN      A       $1" >> /etc/bind/db.$2
+    echo "@     IN      NS      localhost" >> /etc/bind/db.$2
+    #echo "@     IN     TXT    google-site-verification=6tTalLzrBXBO4Gy9700TAbpg2QTKzGYEuZ_Ls69jle8 ;Google verification code" >> /etc/bind/db.$2
+    #echo ";" >> /etc/bind/db.$2
+    #echo "      IN     NS     $(hostname)" >> /etc/bind/db.$2
+    #echo ";" >> /etc/bind/db.$2
+    #echo "      IN     MX     10     mail.$2. ; 10 is a number of preference ; lower means more preference" >> /etc/bind/db.$2
+    #echo "      IN     MX     20     mail2.$2. ; 20 is a number of preference ; this has lower preference that the previous one" >> /etc/bind/db.$2
+    #echo ";" >> /etc/bind/db.$2
+    #echo "$(hostname)         IN     A       127.0.0.1" >> /etc/bind/db.$2
+    #echo "server1      IN     A       127.0.0.1" >> /etc/bind/db.$2
+    #echo "$(hostname)         IN     AAAA    ::1" >> /etc/bind/db.$2
+    #echo "ftp          IN     CNAME   server1" >> /etc/bind/db.$2
+    #echo "mail         IN     CNAME   server1" >> /etc/bind/db.$2
+    #echo "mail2        IN     CNAME   server1" >> /etc/bind/db.$2
+    #echo "www          IN     CNAME   server1" >> /etc/bind/db.$2
+    return 0
+}
+
+# Configures /etc/bind/named.conf.local to create the new zone
+# createZone <FULL_DOMAIN_NAME>
+createZone(){
+    echo '[*] Creating a new zone in the /etc/bind/named.conf.local file'
+    mv /etc/bind/named.conf.local /etc/bind/named.conf.local.old
+    echo "//" >> /etc/bind/named.conf.local
+    echo "// Do any local configuration here" >> /etc/bind/named.conf.local
+    echo "//" >> /etc/bind/named.conf.local
+    echo "" >> /etc/bind/named.conf.local
+    echo "// Consider adding the 1918 zones here, if they are not used in your" >> /etc/bind/named.conf.local
+    echo "// organization" >> /etc/bind/named.conf.local
+    echo "//include "'"'"/etc/bind/zones.rfc1918"'"'";" >> /etc/bind/named.conf.local
+    echo "" >> /etc/bind/named.conf.local
+    echo "// dnser" >> /etc/bind/named.conf.local
+    echo "zone "$1" {" >> /etc/bind/named.conf.local
+    echo "      type master;" >> /etc/bind/named.conf.local
+    echo "      file "'"'"/etc/bind/db.$1"'"'";" >> /etc/bind/named.conf.local
+    echo "};" >> /etc/bind/named.conf.local
+
+    named-checkconf
+    if [ $? -eq 0 ];then
+         echo '[*] named.conf.local file configured successfully'
+         return 0
+    else
+        echo '[-] Error: named.conf.local file misconfigurated'
+        echo '[*] Restoring default file'
+        mv /etc/bind/named.conf.local.old /etc/bind/named.conf.local
+        named-checkconf
+        if [ $? -eq 0 ];then
+            echo '[*] named.conf.local file restored successfully'
+            return 0
+        else
+            echo '[-] Error: Restored named.conf.local file has errors. Please check it and fix those errors.'
             return 1
         fi
     fi
@@ -172,16 +257,16 @@ installBind(){
     fi
 }
 
-# Alias for restarting the server
+# Alias for restarting the service
 restartService(){
     /etc/init.d/named restart
 }
 
 # Prints the usage
 usage(){
-    echo 'USAGE: ./dnser.sh <NETWORK_INTERFACE_TO_LET_BIND9_LISTEN>'
+    echo 'USAGE: ./dnser.sh <IP_ADDRESS (not 127.0.0.1)> <FULL_DOMAIN_NAME>'
     echo ''
-    echo 'EXAMPLE: If my network address is 192.168.1.11, I will run: ./dnser.sh 192.168.1.11'
+    echo 'EXAMPLE: If my network address is 192.168.1.11 and my FQDN is test.com, I will run: ./dnser.sh 192.168.1.11 test.com'
 }
 
 # MAIN
