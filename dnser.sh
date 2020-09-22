@@ -346,9 +346,9 @@ updateResolvConf(){
 
 # Prints the usage
 usage(){
-    echo 'Usage: ./dnser.sh <IP_ADDRESS (not 127.0.0.1)> <FULL_DOMAIN_NAME>'
+    echo 'Usage: ./dnser.sh <IN_IP_ADDRESS> <FULL_DOMAIN_NAME>'
     echo ''
-    echo 'EXAMPLE: If my network address is 192.168.1.11 and my FQDN is test.com, I will run: ./dnser.sh 192.168.1.11 test.com'
+    echo 'EXAMPLE: If the IP address of my network card is 192.168.1.11 and my FQDN is test.com, I will run: ./dnser.sh 192.168.1.11 test.com'
     return 0
 }
 
