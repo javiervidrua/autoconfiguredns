@@ -21,15 +21,15 @@ checkServerWorks(){
     nslookup google.com 127.0.0.1 >/dev/null 2>&1
     if [ $? -ne 0 ]; then
         echo '[-] Error: Bind9 server not working. Trying to start the service...'
-        /etc/init.d/named restart
-        service named status > /dev/null 2>&1
+        /etc/init.d/bind9 restart
+        service bind9 status > /dev/null 2>&1
         if [ $? -eq 0 ]; then
             echo '[*] The bind9 server is now running.'
             return 0
         else
             echo '[-] Error: Could not start the Bind9 server. Try to do it youself by runnining this command:'
             echo ''
-            echo '/etc/init.d/named restart'
+            echo '/etc/init.d/bind9 restart'
             echo ''
             echo '[-] Then, relaunch this script.'
             return 1
@@ -41,7 +41,7 @@ checkServerWorks(){
 
 # Checks if there is ufw installed, if it is, tries to allow Bind9 through it, and if not, calls allowBind9UsingIptables()
 checkFirewallInstalled(){
-    which ufw >/dev/null 2>1
+    which ufw >/dev/null 2>&1
     if [ $? -eq 0 ]; then
         # ufw installed
         ufw allow bind9
@@ -75,7 +75,7 @@ checkRoot(){
 }
 
 # Configures everything
-# configureAll <LOCAL_IP_ADDRESS> <FULL_DOMAIN_NAME> <IP_OF_ONE_DNS_SERVER_ALLOWED_TO_ZONE_TRANSFER>
+# configureAll <LOCAL_IP_ADDRESS> <FULL_DOMAIN_NAME>
 configureAll(){
     installBind
     if [ $? -eq 1 ]; then
@@ -97,7 +97,7 @@ configureAll(){
     if [ $? -eq 1 ]; then
         return 1
     fi
-    createZone $2 $3
+    configureConfLocal $1 $2
     if [ $? -eq 1 ]; then
         return 1
     fi
@@ -106,6 +106,10 @@ configureAll(){
         return 1
     fi
     configureZone $1 $2
+    if [ $? -eq 1 ]; then
+        return 1
+    fi
+    configureReverseZone $1 $2
     if [ $? -eq 1 ]; then
         return 1
     fi
@@ -148,8 +152,19 @@ configureNamedConfOptions(){
     echo "        // you will need to update your keys.  See https://www.isc.org/bind-keys" >> /etc/bind/named.conf.options
     echo "        //========================================================================" >> /etc/bind/named.conf.options
     echo "        dnssec-validation auto;" >> /etc/bind/named.conf.options
+    echo "        auth-nxdomain no;" >> /etc/bind/named.conf.options
     echo "" >> /etc/bind/named.conf.options
     echo "        listen-on-v6 { any; };" >> /etc/bind/named.conf.options
+    echo "        listen-on port 53 { any; };" >> /etc/bind/named.conf.options
+    echo "        allow-query { any; };" >> /etc/bind/named.conf.options
+    echo "        recursion yes;" >> /etc/bind/named.conf.options
+    echo "" >> /etc/bind/named.conf.options
+    echo "        // hide version number from clients for security reasons." >> /etc/bind/named.conf.options
+    echo "        version "'"'"not currently available"'"'";" >> /etc/bind/named.conf.options
+    echo "        // enable the query log" >> /etc/bind/named.conf.options
+    echo "        querylog yes;" >> /etc/bind/named.conf.options
+    echo "        // disallow zone transfer" >> /etc/bind/named.conf.options
+    echo "        allow-transfer { none; };" >> /etc/bind/named.conf.options
     echo "};" >> /etc/bind/named.conf.options
 
     named-checkconf
@@ -171,44 +186,54 @@ configureNamedConfOptions(){
     fi
 }
 
-# Configures the new zone file /etc/bind/db.<FULL_DOMAIN_NAME>
+# Configures the new zone file /etc/bind/forward.<FULL_DOMAIN_NAME>
 # configureZone <LOCAL_IP_ADDRESS> <FULL_DOMAIN_NAME>
 configureZone(){
-    echo '[*] Creating and configuring the zone file /etc/bind/db.$2'
-    echo '' >/etc/bind/db.$2
+    echo '[*] Creating and configuring the zone file /etc/bind/forward.$2'
+    echo '' >/etc/bind/forward.$2
     
-    echo "; dnser" >> /etc/bind/db.$2
-    echo '$ORIGIN $2' >> /etc/bind/db.$2
-    echo '$TTL 86400' >> /etc/bind/db.$2
-    echo "@     IN      SOA     $2.    hostmaster.$2. (" >> /etc/bind/db.$2
-    echo "                      2       ; serial" >> /etc/bind/db.$2
-    echo "                      21600   ; refresh after 6 hours" >> /etc/bind/db.$2
-    echo "                      3600    ; retry after 1 hour" >> /etc/bind/db.$2
-    echo "                      604800  ; expire after 1 week" >> /etc/bind/db.$2
-    echo "                      86400 ) ; minimum TTL of 1 day" >> /etc/bind/db.$2
-    echo ";" >> /etc/bind/db.$2
-    echo "      IN      A       $1" >> /etc/bind/db.$2
-    echo "@     IN      NS      localhost" >> /etc/bind/db.$2
-    #echo "@     IN     TXT    google-site-verification=6tTalLzrBXBO4Gy9700TAbpg2QTKzGYEuZ_Ls69jle8 ;Google verification code" >> /etc/bind/db.$2
-    #echo ";" >> /etc/bind/db.$2
-    #echo "      IN     NS     $(hostname)" >> /etc/bind/db.$2
-    #echo ";" >> /etc/bind/db.$2
-    #echo "      IN     MX     10     mail.$2. ; 10 is a number of preference ; lower means more preference" >> /etc/bind/db.$2
-    #echo "      IN     MX     20     mail2.$2. ; 20 is a number of preference ; this has lower preference that the previous one" >> /etc/bind/db.$2
-    #echo ";" >> /etc/bind/db.$2
-    #echo "$(hostname)         IN     A       127.0.0.1" >> /etc/bind/db.$2
-    #echo "server1      IN     A       127.0.0.1" >> /etc/bind/db.$2
-    #echo "$(hostname)         IN     AAAA    ::1" >> /etc/bind/db.$2
-    #echo "ftp          IN     CNAME   server1" >> /etc/bind/db.$2
-    #echo "mail         IN     CNAME   server1" >> /etc/bind/db.$2
-    #echo "mail2        IN     CNAME   server1" >> /etc/bind/db.$2
-    #echo "www          IN     CNAME   server1" >> /etc/bind/db.$2
+    echo "; dnser" >> /etc/bind/forward.$2
+    echo '$TTL 86400' >> /etc/bind/forward.$2
+    echo "@     IN      SOA     ns1.$2.     root.ns1.$2. (" >> /etc/bind/forward.$2
+    echo "                      2           ; serial" >> /etc/bind/forward.$2
+    echo "                      21600       ; refresh after 6 hours" >> /etc/bind/forward.$2
+    echo "                      3600        ; retry after 1 hour" >> /etc/bind/forward.$2
+    echo "                      604800      ; expire after 1 week" >> /etc/bind/forward.$2
+    echo "                      86400 )     ; minimum TTL of 1 day" >> /etc/bind/forward.$2
+    echo ";" >> /etc/bind/forward.$2
+    echo "@     IN      NS      ns1.$2." >> /etc/bind/forward.$2
+    echo ";" >> /etc/bind/forward.$2
+    echo "ns1   IN      A       $1" >> /etc/bind/forward.$2
+    echo "$2.   IN      A       $1" >> /etc/bind/forward.$2
+    return 0
+}
+
+# Configures the new reverse zone file /etc/bind/reverse.<FULL_DOMAIN_NAME>
+# configureReverseZone <LOCAL_IP_ADDRESS> <FULL_DOMAIN_NAME>
+configureReverseZone(){
+    echo '[*] Creating and configuring the zone file /etc/bind/reverse.$2'
+    echo '' >/etc/bind/reverse.$2
+    
+    echo "; dnser" >> /etc/bind/reverse.$2
+    echo '$TTL 86400' >> /etc/bind/reverse.$2
+    echo "@     IN      SOA     $2.         root.$2. (" >> /etc/bind/reverse.$2
+    echo "                      2           ; serial" >> /etc/bind/reverse.$2
+    echo "                      21600       ; refresh after 6 hours" >> /etc/bind/reverse.$2
+    echo "                      3600        ; retry after 1 hour" >> /etc/bind/reverse.$2
+    echo "                      604800      ; expire after 1 week" >> /etc/bind/reverse.$2
+    echo "                      86400 )     ; minimum TTL of 1 day" >> /etc/bind/reverse.$2
+    echo ";" >> /etc/bind/reverse.$2
+    echo "@     IN      NS      ns1.$2." >> /etc/bind/reverse.$2
+    echo "ns1   IN      A       $1" >> /etc/bind/reverse.$2
+    echo ";" >> /etc/bind/reverse.$2
+    FOURTH=`echo $1 | cut -d. -f4`
+    echo "$FOURTH   IN      PTR     ns1.$2." >> /etc/bind/reverse.$2
     return 0
 }
 
 # Configures /etc/bind/named.conf.local to create the new zone
-# createZone <FULL_DOMAIN_NAME>
-createZone(){
+# configureConfLocal <LOCAL_IP_ADDRESS> <FULL_DOMAIN_NAME>
+configureConfLocal(){
     echo '[*] Creating a new zone in the /etc/bind/named.conf.local file'
     mv /etc/bind/named.conf.local /etc/bind/named.conf.local.old
     echo "//" >> /etc/bind/named.conf.local
@@ -220,9 +245,17 @@ createZone(){
     echo "//include "'"'"/etc/bind/zones.rfc1918"'"'";" >> /etc/bind/named.conf.local
     echo "" >> /etc/bind/named.conf.local
     echo "// dnser" >> /etc/bind/named.conf.local
-    echo "zone "$1" {" >> /etc/bind/named.conf.local
+    echo "zone "'"'$2'"'" {" >> /etc/bind/named.conf.local
     echo "      type master;" >> /etc/bind/named.conf.local
-    echo "      file "'"'"/etc/bind/db.$1"'"'";" >> /etc/bind/named.conf.local
+    echo "      file "'"'"/etc/bind/forward.$2"'"'";" >> /etc/bind/named.conf.local
+    echo "};" >> /etc/bind/named.conf.local
+    FIRST=`echo $1 | cut -d. -f1`
+    SECOND=`echo $1 | cut -d. -f2`
+    THIRD=`echo $1 | cut -d. -f3`
+    FOURTH=`echo $1 | cut -d. -f4`
+    echo "zone "'"'$FOURTH.$THIRD.$SECOND.$FIRST.in-addr-arpa'"'" {" >> /etc/bind/named.conf.local
+    echo "      type master;" >> /etc/bind/named.conf.local
+    echo "      file "'"'"/etc/bind/reverse.$1"'"'";" >> /etc/bind/named.conf.local
     echo "};" >> /etc/bind/named.conf.local
 
     named-checkconf
@@ -247,7 +280,7 @@ createZone(){
 # Updates the system and tries to install bind9
 installBind(){
     echo '[*] Updating your system and installing Bind9'
-    apt update && apt install bind9 -y
+    apt update && apt install bind9 bind9utils dnsutils -y
     if [ $? -eq 0 ]; then
         echo '[*] System updated and bind9 installed successfully'
         return 0
@@ -259,7 +292,7 @@ installBind(){
 
 # Alias for restarting the service
 restartService(){
-    /etc/init.d/named restart
+    /etc/init.d/bind9 restart
 }
 
 # Prints the usage
