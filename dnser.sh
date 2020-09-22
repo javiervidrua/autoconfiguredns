@@ -8,7 +8,7 @@ allowBind9iptables(){ # Implement this
 
 # Checks the arguments passed to the script
 checkArguments(){
-    if [ $# -ne 2 ]; then
+    if [ $# -ne 1 ]; then
         usage
         return 1
     fi
@@ -20,7 +20,7 @@ checkServerWorks(){
     nslookup google.com 127.0.0.1 >/dev/null 2>&1
     if [ $? -ne 0 ]; then
         echo '[-] Error: Bind9 server not working. Trying to start the service...'
-        sudo /etc/init.d/named restart
+        /etc/init.d/named restart
         service named status > /dev/null 2>&1
         if [ $? -eq 0 ]; then
             echo '[*] The bind9 server is now running.'
@@ -28,7 +28,7 @@ checkServerWorks(){
         else
             echo '[-] Error: Could not start the Bind9 server. Try to do it youself by runnining this command:'
             echo ''
-            echo 'sudo /etc/init.d/named restart'
+            echo '/etc/init.d/named restart'
             echo ''
             echo '[-] Then, relaunch this script.'
             return 1
@@ -43,7 +43,7 @@ checkFirewallInstalled(){
     which ufw >/dev/null 2>1
     if [ $? -eq 0 ]; then
         # ufw installed
-        sudo ufw allow bind9
+        ufw allow bind9
         if [ $? -eq 0 ]; then
             echo '[*] Bind9 is allowed through the firewall'
             return 0
@@ -64,25 +64,34 @@ checkFirewallInstalled(){
     fi
 }
 
+# Checks if script was run as root
+checkRoot(){
+    if [ $EUID -eq 0 ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 # Configures everything
 configureAll(){
-    sudo install
+    installBind
     if [ $? -eq 1 ]; then
         return 1
     fi
-    sudo checkServerWorks
+    checkServerWorks
     if [ $? -eq 1 ]; then
         return 1
     fi
-    sudo checkFirewallInstalled
+    checkFirewallInstalled
     if [ $? -eq 1 ]; then
         return 1
     fi
-    sudo configureNamedConfOptions $1
+    configureNamedConfOptions $1
     if [ $? -eq 1 ]; then
         return 1
     fi
-    sudo /etc/init.d/named restart
+    restartService
     if [ $? -eq 1 ]; then
         return 1
     fi
@@ -91,7 +100,7 @@ configureAll(){
 }
 
 # Configures /etc/bind/named.conf.options so it listens on the specified interface
-# sudo configureNamedConfOptions <IP_ADDRESS>
+# configureNamedConfOptions <IP_ADDRESS>
 configureNamedConfOptions(){
     echo '[*] Configuring /etc/bind/named.conf.options file for your IP'
     # Configure named.conf.options
@@ -121,7 +130,7 @@ configureNamedConfOptions(){
     echo "        listen-on-v6 { any; };" >> /etc/bind/named.conf.options
     echo "        listen-on {" >> /etc/bind/named.conf.options
     echo "        $1;" >> /etc/bind/named.conf.options
-    echo "        127.0.0.1" >> /etc/bind/named.conf.options
+    echo "        127.0.0.1;" >> /etc/bind/named.conf.options
     echo "        };" >> /etc/bind/named.conf.options
     echo "" >> /etc/bind/named.conf.options
     echo "        allow-query { any; };" >> /etc/bind/named.conf.options
@@ -151,9 +160,9 @@ configureNamedConfOptions(){
 }
 
 # Updates the system and tries to install bind9
-install(){
+installBind(){
     echo '[*] Updating your system and installing Bind9'
-    sudo apt update && sudo apt install bind9 -y
+    apt update && apt install bind9 -y
     if [ $? -eq 0 ]; then
         echo '[*] System updated and bind9 installed successfully'
         return 0
@@ -161,6 +170,11 @@ install(){
         echo '[-] Error: Could not install bind9 on your system'
         return 1
     fi
+}
+
+# Alias for restarting the server
+restartService(){
+    /etc/init.d/named restart
 }
 
 # Prints the usage
@@ -175,4 +189,9 @@ checkArguments $@ # $@ is an array with all the arguments passed to the program
 if [ $? -ne 0 ]; then
     exit 1
 fi
-configureAll
+checkRoot
+if [ $? -ne 0 ]; then
+    echo '[-] YOU MUST RUN THIS SCRIPT AS ROOT'
+    exit 1
+fi
+configureAll $@ && exit 0
