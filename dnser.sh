@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-# dnser version 0.1
+# dnser version 0.3
 
 # Creates iptables rules to allow bind9 go though
 allowBind9iptables(){ # Implement this
@@ -11,7 +11,11 @@ allowBind9iptables(){ # Implement this
 checkArguments(){
     if [ $# -ne 2 ]; then
         usage
-        return 1
+        if [ $? -eq 0 ]; then
+            return 0
+        else
+            return 1
+        fi
     fi
 }
 
@@ -117,118 +121,20 @@ configureAll(){
     if [ $? -eq 1 ]; then
         return 1
     fi
-
-    echo '[*] Looks like everything went well!'
-    echo '[*] Try to query the server and see if it works!'
-    return 0
-}
-
-# Configures /etc/bind/named.conf.options so it listens on the specified interface
-# configureNamedConfOptions <LOCAL_IP_ADDRESS>
-configureNamedConfOptions(){
-    echo '[*] Configuring /etc/bind/named.conf.options file for your IP'
-    # Configure named.conf.options
-    mv /etc/bind/named.conf.options /etc/bind/named.conf.options.old
-    echo "options {" >> /etc/bind/named.conf.options
-    echo "        directory "'"'"/var/cache/bind"'"'";" >> /etc/bind/named.conf.options
-    echo "" >> /etc/bind/named.conf.options
-    echo "        // If there is a firewall between you and nameservers you want" >> /etc/bind/named.conf.options
-    echo "        // to talk to, you may need to fix the firewall to allow multiple" >> /etc/bind/named.conf.options
-    echo "        // ports to talk.  See http://www.kb.cert.org/vuls/id/800113" >> /etc/bind/named.conf.options
-    echo "" >> /etc/bind/named.conf.options
-    echo "        // If your ISP provided one or more IP addresses for stable" >> /etc/bind/named.conf.options
-    echo "        // nameservers, you probably want to use them as forwarders." >> /etc/bind/named.conf.options
-    echo "        // Uncomment the following block, and insert the addresses replacing" >> /etc/bind/named.conf.options
-    echo "        // the all-0's placeholder." >> /etc/bind/named.conf.options
-    echo "" >> /etc/bind/named.conf.options
-    echo "        // dnser" >> /etc/bind/named.conf.options
-    echo "        forwarders {" >> /etc/bind/named.conf.options
-    echo "             8.8.8.8;" >> /etc/bind/named.conf.options
-    echo "             8.8.4.4;" >> /etc/bind/named.conf.options
-    echo "        };" >> /etc/bind/named.conf.options
-    echo "" >> /etc/bind/named.conf.options
-    echo "        //========================================================================" >> /etc/bind/named.conf.options
-    echo "        // If BIND logs error messages about the root key being expired," >> /etc/bind/named.conf.options
-    echo "        // you will need to update your keys.  See https://www.isc.org/bind-keys" >> /etc/bind/named.conf.options
-    echo "        //========================================================================" >> /etc/bind/named.conf.options
-    echo "        dnssec-validation auto;" >> /etc/bind/named.conf.options
-    echo "        auth-nxdomain no;" >> /etc/bind/named.conf.options
-    echo "" >> /etc/bind/named.conf.options
-    echo "        listen-on-v6 { any; };" >> /etc/bind/named.conf.options
-    echo "        listen-on port 53 { any; };" >> /etc/bind/named.conf.options
-    echo "        allow-query { any; };" >> /etc/bind/named.conf.options
-    echo "        recursion yes;" >> /etc/bind/named.conf.options
-    echo "" >> /etc/bind/named.conf.options
-    echo "        // hide version number from clients for security reasons." >> /etc/bind/named.conf.options
-    echo "        version "'"'"not currently available"'"'";" >> /etc/bind/named.conf.options
-    echo "        // enable the query log" >> /etc/bind/named.conf.options
-    echo "        querylog yes;" >> /etc/bind/named.conf.options
-    echo "        // disallow zone transfer" >> /etc/bind/named.conf.options
-    echo "        allow-transfer { none; };" >> /etc/bind/named.conf.options
-    echo "};" >> /etc/bind/named.conf.options
-
-    named-checkconf
-    if [ $? -eq 0 ];then
-         echo '[*] named.conf.options file configured successfully'
-         return 0
-    else
-        echo '[-] Error: named.conf.options file misconfigurated'
-        echo '[*] Restoring default file'
-        mv /etc/bind/named.conf.options.old /etc/bind/named.conf.options
-        named-checkconf
-        if [ $? -eq 0 ];then
-            echo '[*] named.conf.options file restored successfully'
-            return 0
-        else
-            echo '[-] Error: Restored named.conf.options file has errors. Please check it and fix those errors.'
-            return 1
-        fi
+    updateResolvConf
+    if [ $? -eq 1 ]; then
+        return 1
     fi
-}
-
-# Configures the new zone file /etc/bind/forward.<FULL_DOMAIN_NAME>
-# configureZone <LOCAL_IP_ADDRESS> <FULL_DOMAIN_NAME>
-configureZone(){
-    echo '[*] Creating and configuring the zone file /etc/bind/forward.$2'
-    echo '' >/etc/bind/forward.$2
-    
-    echo "; dnser" >> /etc/bind/forward.$2
-    echo '$TTL 86400' >> /etc/bind/forward.$2
-    echo "@     IN      SOA     ns1.$2.     root.ns1.$2. (" >> /etc/bind/forward.$2
-    echo "                      2           ; serial" >> /etc/bind/forward.$2
-    echo "                      21600       ; refresh after 6 hours" >> /etc/bind/forward.$2
-    echo "                      3600        ; retry after 1 hour" >> /etc/bind/forward.$2
-    echo "                      604800      ; expire after 1 week" >> /etc/bind/forward.$2
-    echo "                      86400 )     ; minimum TTL of 1 day" >> /etc/bind/forward.$2
-    echo ";" >> /etc/bind/forward.$2
-    echo "@     IN      NS      ns1.$2." >> /etc/bind/forward.$2
-    echo ";" >> /etc/bind/forward.$2
-    echo "ns1   IN      A       $1" >> /etc/bind/forward.$2
-    echo "$2.   IN      A       $1" >> /etc/bind/forward.$2
-    return 0
-}
-
-# Configures the new reverse zone file /etc/bind/reverse.<FULL_DOMAIN_NAME>
-# configureReverseZone <LOCAL_IP_ADDRESS> <FULL_DOMAIN_NAME>
-configureReverseZone(){
-    echo '[*] Creating and configuring the zone file /etc/bind/reverse.$2'
-    echo '' >/etc/bind/reverse.$2
-    
-    echo "; dnser" >> /etc/bind/reverse.$2
-    echo '$TTL 86400' >> /etc/bind/reverse.$2
-    echo "@     IN      SOA     $2.         root.$2. (" >> /etc/bind/reverse.$2
-    echo "                      2           ; serial" >> /etc/bind/reverse.$2
-    echo "                      21600       ; refresh after 6 hours" >> /etc/bind/reverse.$2
-    echo "                      3600        ; retry after 1 hour" >> /etc/bind/reverse.$2
-    echo "                      604800      ; expire after 1 week" >> /etc/bind/reverse.$2
-    echo "                      86400 )     ; minimum TTL of 1 day" >> /etc/bind/reverse.$2
-    echo ";" >> /etc/bind/reverse.$2
-    echo "@     IN      NS      ns1.$2." >> /etc/bind/reverse.$2
-    echo "ns1   IN      A       $1" >> /etc/bind/reverse.$2
-    echo ";" >> /etc/bind/reverse.$2
-    FOURTH=`echo $1 | cut -d. -f4`
-    echo "$FOURTH   IN      PTR     ns1.$2." >> /etc/bind/reverse.$2
-    return 0
+    host ns1.$2
+    if [ $? -eq 0 ]; then
+        echo '[*] Looks like everything went well!'
+        echo '[*] Try to query the server and see if it works!'
+        return 0
+    else
+        echo '[-] Error: Looks like the DNS is not working!'
+        echo '[-] Check the config directory and restart the service'
+        return 1
+    fi
 }
 
 # Configures /etc/bind/named.conf.local to create the new zone
@@ -277,6 +183,130 @@ configureConfLocal(){
     fi
 }
 
+# Configures /etc/bind/named.conf.options so it listens on the specified interface
+# configureNamedConfOptions <LOCAL_IP_ADDRESS>
+configureNamedConfOptions(){
+    echo '[*] Configuring /etc/bind/named.conf.options file for your IP'
+    # Configure named.conf.options
+    mv /etc/bind/named.conf.options /etc/bind/named.conf.options.old
+    echo "options {" >> /etc/bind/named.conf.options
+    echo "        directory "'"'"/var/cache/bind"'"'";" >> /etc/bind/named.conf.options
+    echo "" >> /etc/bind/named.conf.options
+    echo "        // If there is a firewall between you and nameservers you want" >> /etc/bind/named.conf.options
+    echo "        // to talk to, you may need to fix the firewall to allow multiple" >> /etc/bind/named.conf.options
+    echo "        // ports to talk.  See http://www.kb.cert.org/vuls/id/800113" >> /etc/bind/named.conf.options
+    echo "" >> /etc/bind/named.conf.options
+    echo "        // If your ISP provided one or more IP addresses for stable" >> /etc/bind/named.conf.options
+    echo "        // nameservers, you probably want to use them as forwarders." >> /etc/bind/named.conf.options
+    echo "        // Uncomment the following block, and insert the addresses replacing" >> /etc/bind/named.conf.options
+    echo "        // the all-0's placeholder." >> /etc/bind/named.conf.options
+    echo "" >> /etc/bind/named.conf.options
+    echo "        // dnser" >> /etc/bind/named.conf.options
+    echo "        forwarders {" >> /etc/bind/named.conf.options
+    echo "             8.8.8.8;" >> /etc/bind/named.conf.options
+    echo "             8.8.4.4;" >> /etc/bind/named.conf.options
+    echo "        };" >> /etc/bind/named.conf.options
+    echo "" >> /etc/bind/named.conf.options
+    echo "        //========================================================================" >> /etc/bind/named.conf.options
+    echo "        // If BIND logs error messages about the root key being expired," >> /etc/bind/named.conf.options
+    echo "        // you will need to update your keys.  See https://www.isc.org/bind-keys" >> /etc/bind/named.conf.options
+    echo "        //========================================================================" >> /etc/bind/named.conf.options
+    echo "        dnssec-validation auto;" >> /etc/bind/named.conf.options
+    echo "        auth-nxdomain no;" >> /etc/bind/named.conf.options
+    echo "" >> /etc/bind/named.conf.options
+    echo "        listen-on-v6 { any; };" >> /etc/bind/named.conf.options
+    echo "        listen-on port 53 { any; };" >> /etc/bind/named.conf.options
+    echo "        allow-query { any; };" >> /etc/bind/named.conf.options
+    echo "        recursion yes;" >> /etc/bind/named.conf.options
+    echo "" >> /etc/bind/named.conf.options
+    echo "        // hide version number from clients for security reasons." >> /etc/bind/named.conf.options
+    echo "        version "'"'"not currently available"'"'";" >> /etc/bind/named.conf.options
+    echo "        // enable the query log" >> /etc/bind/named.conf.options
+    echo "        querylog yes;" >> /etc/bind/named.conf.options
+    echo "        // disallow zone transfer" >> /etc/bind/named.conf.options
+    echo "        allow-transfer { none; };" >> /etc/bind/named.conf.options
+    echo "};" >> /etc/bind/named.conf.options
+
+    named-checkconf /etc/bind/named.conf.options
+    if [ $? -eq 0 ];then
+         echo '[*] named.conf.options file configured successfully'
+         return 0
+    else
+        echo '[-] Error: named.conf.options file misconfigurated'
+        echo '[*] Restoring default file'
+        mv /etc/bind/named.conf.options.old /etc/bind/named.conf.options
+        named-checkconf
+        if [ $? -eq 0 ];then
+            echo '[*] named.conf.options file restored successfully'
+            return 0
+        else
+            echo '[-] Error: Restored named.conf.options file has errors. Please check it and fix those errors.'
+            return 1
+        fi
+    fi
+}
+
+# Configures the new zone file /etc/bind/forward.<FULL_DOMAIN_NAME>
+# configureZone <LOCAL_IP_ADDRESS> <FULL_DOMAIN_NAME>
+configureZone(){
+    echo '[*] Creating and configuring the zone file /etc/bind/forward.$2'
+    echo '' >/etc/bind/forward.$2
+    
+    echo "; dnser" >> /etc/bind/forward.$2
+    echo '$TTL 86400' >> /etc/bind/forward.$2
+    echo "@     IN      SOA     ns1.$2.     root.ns1.$2. (" >> /etc/bind/forward.$2
+    echo "                      2           ; serial" >> /etc/bind/forward.$2
+    echo "                      21600       ; refresh after 6 hours" >> /etc/bind/forward.$2
+    echo "                      3600        ; retry after 1 hour" >> /etc/bind/forward.$2
+    echo "                      604800      ; expire after 1 week" >> /etc/bind/forward.$2
+    echo "                      86400 )     ; minimum TTL of 1 day" >> /etc/bind/forward.$2
+    echo ";" >> /etc/bind/forward.$2
+    echo "@     IN      NS      ns1.$2." >> /etc/bind/forward.$2
+    echo ";" >> /etc/bind/forward.$2
+    echo "ns1   IN      A       $1" >> /etc/bind/forward.$2
+    echo "$2.   IN      A       $1" >> /etc/bind/forward.$2
+
+    named-checkzone /etc/bind/forward.$2
+    if [ $? -eq 0 ];then
+         echo "[*] /etc/bind/forward.$2 file configured successfully"
+         return 0
+    else
+        echo "[-] Error: /etc/bind/forward.$2 file has errors. Please check it and fix those errors."
+        return 1
+    fi
+}
+
+# Configures the new reverse zone file /etc/bind/reverse.<FULL_DOMAIN_NAME>
+# configureReverseZone <LOCAL_IP_ADDRESS> <FULL_DOMAIN_NAME>
+configureReverseZone(){
+    echo '[*] Creating and configuring the zone file /etc/bind/reverse.$2'
+    echo '' >/etc/bind/reverse.$2
+    
+    echo "; dnser" >> /etc/bind/reverse.$2
+    echo '$TTL 86400' >> /etc/bind/reverse.$2
+    echo "@     IN      SOA     $2.         root.$2. (" >> /etc/bind/reverse.$2
+    echo "                      2           ; serial" >> /etc/bind/reverse.$2
+    echo "                      21600       ; refresh after 6 hours" >> /etc/bind/reverse.$2
+    echo "                      3600        ; retry after 1 hour" >> /etc/bind/reverse.$2
+    echo "                      604800      ; expire after 1 week" >> /etc/bind/reverse.$2
+    echo "                      86400 )     ; minimum TTL of 1 day" >> /etc/bind/reverse.$2
+    echo ";" >> /etc/bind/reverse.$2
+    echo "@     IN      NS      ns1.$2." >> /etc/bind/reverse.$2
+    echo "ns1   IN      A       $1" >> /etc/bind/reverse.$2
+    echo ";" >> /etc/bind/reverse.$2
+    FOURTH=`echo $1 | cut -d. -f4`
+    echo "$FOURTH   IN      PTR     ns1.$2." >> /etc/bind/reverse.$2
+
+    named-checkzone /etc/bind/reverse.$2
+    if [ $? -eq 0 ];then
+         echo "[*] /etc/bind/reverse.$2 file configured successfully"
+         return 0
+    else
+        echo "[-] Error: /etc/bind/reverse.$2 file has errors. Please check it and fix those errors."
+        return 1
+    fi
+}
+
 # Updates the system and tries to install bind9
 installBind(){
     echo '[*] Updating your system and installing Bind9'
@@ -292,7 +322,22 @@ installBind(){
 
 # Alias for restarting the service
 restartService(){
-    /etc/init.d/bind9 restart
+    echo '[*] Restarting the nameserver'
+    if [ -e /etc/init.d/named ]; then
+        /etc/init.d/named restart
+    elif [ -e /etc/init.d/bind9 ]; then
+        /etc/init.d/bind9 restart
+    fi
+}
+
+# Updates the file /etc/resolv.conf
+# updateResolvConf <LOCAL_IP_ADDRESS> <FULL_DOMAIN_NAME>
+updateResolvConf(){
+    echo '[*] Updating /etc/resolv.conf to use the new DNS server'
+    echo "" > /etc/resolv.conf
+    echo "search $2" >> /etc/resolv.conf
+    echo "nameserver $1" >> /etc/resolv.conf
+    return 0
 }
 
 # Prints the usage
@@ -300,6 +345,7 @@ usage(){
     echo 'Usage: ./dnser.sh <IP_ADDRESS (not 127.0.0.1)> <FULL_DOMAIN_NAME>'
     echo ''
     echo 'EXAMPLE: If my network address is 192.168.1.11 and my FQDN is test.com, I will run: ./dnser.sh 192.168.1.11 test.com'
+    return 0
 }
 
 # MAIN
