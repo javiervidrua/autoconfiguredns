@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-# dnser version 0.3
+# dnser version 0.4
 
 # Creates iptables rules to allow bind9 go though
 allowBind9iptables(){ # Implement this
@@ -11,11 +11,7 @@ allowBind9iptables(){ # Implement this
 checkArguments(){
     if [ $# -ne 2 ]; then
         usage
-        if [ $? -eq 0 ]; then
-            return 0
-        else
-            return 1
-        fi
+        return 1
     fi
 }
 
@@ -121,7 +117,7 @@ configureAll(){
     if [ $? -eq 1 ]; then
         return 1
     fi
-    updateResolvConf
+    updateResolvConf $1 $2
     if [ $? -eq 1 ]; then
         return 1
     fi
@@ -266,7 +262,7 @@ configureZone(){
     echo "ns1   IN      A       $1" >> /etc/bind/forward.$2
     echo "$2.   IN      A       $1" >> /etc/bind/forward.$2
 
-    named-checkzone /etc/bind/forward.$2
+    named-checkzone $2 /etc/bind/forward.$2
     if [ $? -eq 0 ];then
          echo "[*] /etc/bind/forward.$2 file configured successfully"
          return 0
@@ -297,7 +293,7 @@ configureReverseZone(){
     FOURTH=`echo $1 | cut -d. -f4`
     echo "$FOURTH   IN      PTR     ns1.$2." >> /etc/bind/reverse.$2
 
-    named-checkzone /etc/bind/reverse.$2
+    named-checkzone $2 /etc/bind/reverse.$2
     if [ $? -eq 0 ];then
          echo "[*] /etc/bind/reverse.$2 file configured successfully"
          return 0
@@ -325,8 +321,16 @@ restartService(){
     echo '[*] Restarting the nameserver'
     if [ -e /etc/init.d/named ]; then
         /etc/init.d/named restart
+        if [ $? -eq 1 ]; then
+            return 1
+        fi
+        return 0
     elif [ -e /etc/init.d/bind9 ]; then
         /etc/init.d/bind9 restart
+        if [ $? -eq 1 ]; then
+            return 1
+        fi
+        return 0
     fi
 }
 
