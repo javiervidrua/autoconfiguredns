@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-# autoconfiguredns version 0.43
+# autoconfiguredns version 0.5
 
 # Creates iptables rules to allow bind9 go though
 # allowBind9iptables <LOCAL_IP_ADDRESS>
@@ -159,7 +159,7 @@ configureConfLocal(){
     echo "// organization" >> /etc/bind/named.conf.local
     echo "//include "'"'"/etc/bind/zones.rfc1918"'"'";" >> /etc/bind/named.conf.local
     echo "" >> /etc/bind/named.conf.local
-    echo "// dnser" >> /etc/bind/named.conf.local
+    echo "// autoconfiguredns" >> /etc/bind/named.conf.local
     echo "zone "'"'$2'"'" {" >> /etc/bind/named.conf.local
     echo "      type master;" >> /etc/bind/named.conf.local
     echo "      file "'"'"/etc/bind/forward.$2"'"'";" >> /etc/bind/named.conf.local
@@ -210,7 +210,7 @@ configureNamedConfOptions(){
     echo "        // Uncomment the following block, and insert the addresses replacing" >> /etc/bind/named.conf.options
     echo "        // the all-0's placeholder." >> /etc/bind/named.conf.options
     echo "" >> /etc/bind/named.conf.options
-    echo "        // dnser" >> /etc/bind/named.conf.options
+    echo "        // autoconfiguredns" >> /etc/bind/named.conf.options
     echo "        forwarders {" >> /etc/bind/named.conf.options
     echo "             8.8.8.8;" >> /etc/bind/named.conf.options
     echo "             8.8.4.4;" >> /etc/bind/named.conf.options
@@ -262,7 +262,7 @@ configureZone(){
     echo '[*] Creating and configuring the zone file /etc/bind/forward.$2'
     echo '' >/etc/bind/forward.$2
     
-    echo "; dnser" >> /etc/bind/forward.$2
+    echo "; autoconfiguredns" >> /etc/bind/forward.$2
     echo '$TTL 86400' >> /etc/bind/forward.$2
     echo "@     IN      SOA     ns1.$2.     root.ns1.$2. (" >> /etc/bind/forward.$2
     echo "                      2           ; serial" >> /etc/bind/forward.$2
@@ -292,7 +292,7 @@ configureReverseZone(){
     echo '[*] Creating and configuring the zone file /etc/bind/reverse.$2'
     echo '' >/etc/bind/reverse.$2
     
-    echo "; dnser" >> /etc/bind/reverse.$2
+    echo "; autoconfiguredns" >> /etc/bind/reverse.$2
     echo '$TTL 86400' >> /etc/bind/reverse.$2
     echo "@     IN      SOA     $2.         root.$2. (" >> /etc/bind/reverse.$2
     echo "                      2           ; serial" >> /etc/bind/reverse.$2
