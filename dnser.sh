@@ -1,10 +1,11 @@
 #! /usr/bin/env bash
 
-# dnser version 0.41
+# dnser version 0.42
 
 # Creates iptables rules to allow bind9 go though
 # allowBind9iptables <LOCAL_IP_ADDRESS>
 allowBind9iptables(){ # Implement this
+    echo '[*] Creating iptables rules to allow the service to do its job'
     # Allow outgoing client requests to other servers
     iptables -A OUTPUT -p udp -s $1 --sport 1024:65535 --dport 53 -m state --state NEW,ESTABLISHED -j ACCEPT
     iptables -A INPUT -p udp --sport 53 -d $1 --dport 1024:65535 -m state --state ESTABLISHED -j ACCEPT
@@ -68,10 +69,10 @@ checkFirewallInstalled(){
         # ufw not installed, allow through iptables
         allowBind9iptables()
         if [ $? -eq 0 ]; then
-            echo '[*] Bind9 is allowed through the firewall'
+            echo '[*] Bind9 is allowed through iptables'
             return 0
         else
-            echo '[-] Error: Could not allow Bind9 through the firewall'
+            echo '[-] Error: Could not allow Bind9 through iptables'
             return 1
         fi
     fi
