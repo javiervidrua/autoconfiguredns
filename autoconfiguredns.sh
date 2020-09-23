@@ -359,7 +359,7 @@ updateResolvConf(){
 
 # Prints the usage
 usage(){
-    echo 'Usage: ./autoconfiguredns.sh <IN_IP_ADDRESS> <FULL_DOMAIN_NAME>'
+    echo 'Usage: ./autoconfiguredns.sh <IN_IP_ADDRESS> <FQDN>'
     echo ''
     echo 'EXAMPLE: If the IP address of my network card is 10.1.2.3 and my FQDN is test.com, I will run: ./autoconfiguredns.sh 10.1.2.3 test.com'
     return 0
