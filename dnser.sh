@@ -1,10 +1,22 @@
 #! /usr/bin/env bash
 
-# dnser version 0.4
+# dnser version 0.41
 
 # Creates iptables rules to allow bind9 go though
+# allowBind9iptables <LOCAL_IP_ADDRESS>
 allowBind9iptables(){ # Implement this
-    return 1
+    # Allow outgoing client requests to other servers
+    iptables -A OUTPUT -p udp -s $1 --sport 1024:65535 --dport 53 -m state --state NEW,ESTABLISHED -j ACCEPT
+    iptables -A INPUT -p udp --sport 53 -d $1 --dport 1024:65535 -m state --state ESTABLISHED -j ACCEPT
+    iptables -A OUTPUT -p tcp -s $1 --sport 1024:65535 --dport 53 -m state --state NEW,ESTABLISHED -j ACCEPT
+    iptables -A INPUT -p tcp --sport 53 -d $1 --dport 1024:65535 -m state --state ESTABLISHED -j ACCEPT
+
+    #Allow incoming DNS queries to the server on port 53
+    #Do not allow TCP so no zone transfers allowed
+    iptables -A OUTPUT -p udp -s $1 --sport 53 -d 0/0 --dport 1024:65535 -m state --state ESTABLISHED -j ACCEPT
+    iptables -A INPUT -p udp -s 0/0 --sport 1024:65535 -d $1 --dport 53 -m state --state NEW,ESTABLISHED -j ACCEPT
+    iptables -A OUTPUT -p udp -s $1 --sport 53 -d 0/0 --dport 53 -m state --state ESTABLISHED -j ACCEPT
+    iptables -A INPUT -p udp -s 0/0 --sport 53 -d $1 --dport 53 -m state --state NEW,ESTABLISHED -j ACCEPT
 }
 
 # Checks the arguments passed to the script
@@ -359,7 +371,7 @@ if [ $? -ne 0 ]; then
 fi
 checkRoot
 if [ $? -ne 0 ]; then
-    echo '[-] YOU MUST RUN THIS SCRIPT AS ROOT'
+    echo '[-] You must run this script as root.'
     exit 1
 fi
 configureAll $@ && exit 0
