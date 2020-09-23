@@ -1,5 +1,5 @@
-# dnser
-Automatizes the process of installing bind9 on a Debian-based system and configuring all the files so it works for your domain.
+# autoconfiguredns
+Automatizes the process of installing bind9 on a Debian-based system and configuring all the files so it works for your specific domain.
 
 ## Usage
 `./dnser.sh <IN_IP_ADDRESS> <FULL_DOMAIN_NAME>'`
