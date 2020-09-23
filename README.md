@@ -1,6 +1,6 @@
 # autoconfiguredns
-Automatizes the process of installing bind9 on a Debian-based system and configuring all the files so it works for your specific domain.
-
+Automatically installs Bind9 on your Debian-based system and does a base, working configuration so in matter of seconds you have your own DNS server up and running.
+ 
 ## Usage
 `./dnser.sh <IN_IP_ADDRESS> <FULL_DOMAIN_NAME>'`
 
