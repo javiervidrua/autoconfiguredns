@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-# dnser version 0.42
+# autoconfiguredns version 0.43
 
 # Creates iptables rules to allow bind9 go though
 # allowBind9iptables <LOCAL_IP_ADDRESS>
