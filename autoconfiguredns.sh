@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-# autoconfiguredns version 0.5
+# autoconfiguredns version 0.5.0
 
 # Creates iptables rules to allow bind9 go though
 # allowBind9iptables <LOCAL_IP_ADDRESS>
