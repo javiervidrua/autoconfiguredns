@@ -230,6 +230,7 @@ configureNamedConfOptions(){
     echo "" >> /etc/bind/named.conf.options
     echo "        // hide version number from clients for security reasons." >> /etc/bind/named.conf.options
     echo "        version "'"'"not currently available"'"'";" >> /etc/bind/named.conf.options
+    echo "        // to check -> dig -c CH -t txt version.bind @localhost" >> /etc/bind/named.conf.options
     echo "        // enable the query log" >> /etc/bind/named.conf.options
     echo "        querylog yes;" >> /etc/bind/named.conf.options
     echo "        // disallow zone transfer" >> /etc/bind/named.conf.options
