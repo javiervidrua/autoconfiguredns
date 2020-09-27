@@ -1,5 +1,6 @@
 #! /usr/bin/env bash
 
+# 2020 Javier Vidal Ruano
 # autoconfiguredns version 0.5.1
 
 # Creates iptables rules to allow bind9 go though
