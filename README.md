@@ -16,3 +16,8 @@ Automatically installs *Bind9* on your *Debian-based* system and does a base, wo
 
 ## Usage
 `./autoconfiguredns.sh <IN_IP_ADDRESS> <FQDN>`
+
+## Example
+If my Internet IP is '*10.10.10.51*' and my FQDN is '*test.com*', I would run:
+
+`./autoconfiguredns 10.10.10.51 test.com`
