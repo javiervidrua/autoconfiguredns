@@ -107,50 +107,17 @@ checkRoot(){
 # Configures everything
 # configureAll <LOCAL_IP_ADDRESS> <FULL_DOMAIN_NAME>
 configureAll(){
-    installBind
-    if [ $? -eq 1 ]; then
-        return 1
-    fi
-    checkServerWorks
-    if [ $? -eq 1 ]; then
-        return 1
-    fi
-    checkFirewallInstalled
-    if [ $? -eq 1 ]; then
-        return 1
-    fi
-    configureNamedConfOptions $1
-    if [ $? -eq 1 ]; then
-        return 1
-    fi
-    restartService
-    if [ $? -eq 1 ]; then
-        return 1
-    fi
-    configureConfLocal $1 $2
-    if [ $? -eq 1 ]; then
-        return 1
-    fi
-    restartService
-    if [ $? -eq 1 ]; then
-        return 1
-    fi
-    configureZone $1 $2
-    if [ $? -eq 1 ]; then
-        return 1
-    fi
-    configureReverseZone $1 $2
-    if [ $? -eq 1 ]; then
-        return 1
-    fi
-    restartService
-    if [ $? -eq 1 ]; then
-        return 1
-    fi
-    updateResolvConf $1 $2
-    if [ $? -eq 1 ]; then
-        return 1
-    fi
+    installBind || return 1
+    checkServerWorks || return 1
+    checkFirewallInstalled || return 1
+    configureNamedConfOptions $1 || return 1
+    restartService || return 1
+    configureConfLocal $1 $2 || return 1
+    restartService || return 1
+    configureZone $1 $2 || return 1
+    configureReverseZone $1 $2 || return 1
+    restartService || return 1
+    updateResolvConf $1 $2 || return 1
     host ns1.$2
     if [ $? -eq 0 ]; then
         echo '[*] Looks like everything went well!'
