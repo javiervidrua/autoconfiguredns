@@ -154,7 +154,7 @@ configureConfLocal(){
     FOURTH=`echo $1 | cut -d. -f4`
     echo "zone "'"'$FOURTH.$THIRD.$SECOND.$FIRST.in-addr-arpa'"'" {" >> /etc/bind/named.conf.local
     echo "      type master;" >> /etc/bind/named.conf.local
-    echo "      file "'"'"/etc/bind/reverse.$1"'"'";" >> /etc/bind/named.conf.local
+    echo "      file "'"'"/etc/bind/reverse.$2"'"'";" >> /etc/bind/named.conf.local
     echo "};" >> /etc/bind/named.conf.local
 
     named-checkconf
