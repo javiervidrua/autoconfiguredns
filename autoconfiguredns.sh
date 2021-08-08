@@ -243,7 +243,7 @@ configureNamedConfOptions(){
 # Configures the new zone file /etc/bind/forward.<FULL_DOMAIN_NAME>
 # configureZone <LOCAL_IP_ADDRESS> <FULL_DOMAIN_NAME>
 configureZone(){
-    echo '[*] Creating and configuring the zone file /etc/bind/forward.$2'
+    echo "[*] Creating and configuring the zone file /etc/bind/forward.$2"
     echo '' >/etc/bind/forward.$2
     
     echo "; autoconfiguredns" >> /etc/bind/forward.$2
@@ -273,7 +273,7 @@ configureZone(){
 # Configures the new reverse zone file /etc/bind/reverse.<FULL_DOMAIN_NAME>
 # configureReverseZone <LOCAL_IP_ADDRESS> <FULL_DOMAIN_NAME>
 configureReverseZone(){
-    echo '[*] Creating and configuring the zone file /etc/bind/reverse.$2'
+    echo "[*] Creating and configuring the zone file /etc/bind/reverse.$2"
     echo '' >/etc/bind/reverse.$2
     
     echo "; autoconfiguredns" >> /etc/bind/reverse.$2
