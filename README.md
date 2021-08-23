@@ -1,7 +1,7 @@
 # autoconfiguredns
 Automatically installs *Bind9* on your *Debian-based* system and does a base, working configuration so **in matter of seconds you have your own DNS server up and running**.
 
-**It is meant to be used with a freshly installed system**, but it also works on a system that already has *Bind9* installed, but it overwrites configuration files, so make sure to perform a backup before running it if this is your case.
+**It is meant to be used with a freshly installed system** but it also works on a system that already has *Bind9* installed, but it overwrites configuration files, so make sure to perform a backup before running it if this is your case.
 
 This tool configures the Bind9 service to make it work as a Master server, and accepts all queries.
 
